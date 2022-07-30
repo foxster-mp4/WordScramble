@@ -11,6 +11,8 @@ import UIKit
 class ViewController: UITableViewController {
     var allWords: [String] = []
     var usedWords: [String] = []
+    let defaults = UserDefaults.standard
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -29,12 +31,28 @@ class ViewController: UITableViewController {
             allWords = ["silkworm"]
         }
         
+        title = defaults.string(forKey: "wordscrambleword") ?? ""
+        
+        if !(title?.isEmpty ?? true) {
+            let decoder = JSONDecoder()
+            if let savedData = defaults.object(forKey: "wordscrambleusedwords") as? Data {
+                do {
+                    usedWords = try decoder.decode(type(of: usedWords), from: savedData)
+                    return // Successfully loaded all saved data; exit method now to prevent further execution (which starts game from scratch)
+                } catch {
+                    print("Unable to load previous used words; they might not have existed/been saved in the first place.")
+                }
+            }
+        }
+        
+        // If still here, saved data was unable to be loaded; must start game from scratch
         startGame()
     }
     
     @objc func startGame() {
         title = allWords.randomElement()
         usedWords.removeAll(keepingCapacity: true)
+        saveData()
         tableView.reloadData()
     }
     
@@ -74,10 +92,9 @@ class ViewController: UITableViewController {
                         if (isOriginal(word: lowercaseAnswer)){
                             if (isReal(word: lowercaseAnswer)) {
                                 usedWords.insert(lowercaseAnswer, at: 0)
-                                
+                                saveData()
                                 tableView.insertRows(at: [IndexPath(row: 0, section: 0)], with: .automatic)
-                                
-                                return
+                                return // Might be redundant but if it ain't broke don't fix it
                             } else { // Word is not real
                                 showErrorMessge("Word not recognized")
                             }
@@ -147,6 +164,15 @@ class ViewController: UITableViewController {
         alertController.addAction(UIAlertAction(title: "Dismiss", style: .cancel))
         
         present(alertController, animated: true)
+    }
+    
+    func saveData() {
+        defaults.set(title, forKey: "wordscrambleword")
+        
+        let encoder = JSONEncoder()
+        if let data = try? encoder.encode(usedWords) {
+            defaults.set(data, forKey: "wordscrambleusedwords")
+        }
     }
     
 }
